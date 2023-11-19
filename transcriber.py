@@ -11,9 +11,33 @@ import whisper
 
 from googletrans import Translator
 import yt_dlp as youtube_dl
+import argparse
+from pathlib import Path
+
+from distutils.util import strtobool
+
+ROOT_DIR = Path(__file__).resolve().parent
+TMP_DIR = ROOT_DIR / "tmp"
 
 
-AUDIOFILE = "audio.mp3"  # Save audio file as audio.mp3
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Audio transcriber using OpenAI's Whisper speech recognition model.")
+    parser.add_argument("-u", "--url", type=str, nargs='?', help="YouTube video URL")
+    parser.add_argument("--audio-file", type=Path, nargs='?', default=TMP_DIR / "audio.mp3",
+                        help="Path to audio file on disk")
+    parser.add_argument("--transcription-file", type=Path, nargs='?', default=TMP_DIR / "transcription.txt",
+                        help="Path to transcript file on disk")
+    parser.add_argument("--translation-file", type=Path, nargs='?', default=TMP_DIR / "translation.txt",
+                        help="Path to translation file on disk")
+    parser.add_argument("--modelname", type=str, nargs='?', default="large",
+                        help=f"Select speech recognition model name: {whisper.available_models()}")
+    parser.add_argument("--translate", type=lambda x: bool(strtobool(x)),
+                        nargs='?',
+                        default=False,
+                        help="Translate audio transcription to English")
+    args = parser.parse_args()
+    return args
 
 
 def match_pattern(pattern, arg):
@@ -26,23 +50,23 @@ def match_pattern(pattern, arg):
     return url
 
 
-def get_audio(url, argv):
+def get_audio(args):
     """
     Download mp3 audio of a YouTube video. Credit to Stokry.
     https://dev.to/stokry/download-youtube-video-to-mp3-with-python-26p
     """
-    try:
-        opts, args = getopt.getopt(argv, "u:", ["url="])
-    except:
-        print("Usage: python3 transcriber.py -u <url>")
-    for opt, arg in opts:
-        if opt in ['-u', '--url']:
-            url = match_pattern("shorts/", arg)
-    video_info = youtube_dl.YoutubeDL().extract_info(url=url, download=False)
+    # try:
+    #     opts, args = getopt.getopt(argv, "u:", ["url="])
+    # except:
+    #     print("Usage: python3 transcriber.py -u <url>")
+    # for opt, arg in opts:
+    #     if opt in ['-u', '--url']:
+    #         url = match_pattern("shorts/", arg)
+    video_info = youtube_dl.YoutubeDL().extract_info(url=args.url, download=False)
     options = {
         'format': 'bestaudio/best',
         'keepvideo': False,
-        'outtmpl': AUDIOFILE,
+        'outtmpl': args.audio_file,
     }
     with youtube_dl.YoutubeDL(options) as ydl:
         ydl.download([video_info['webpage_url']])
@@ -62,13 +86,12 @@ def check_device():
     return device
 
 
-def get_result():
+def get_result(args):
     """Get speech recognition model."""
-    model_name = input("Select speech recognition model name (tiny, base, small, medium, large): ")
     banner("Transcribing text")
-    model = whisper.load_model(model_name, device=check_device())
-    result = model.transcribe(AUDIOFILE)
-    format_result('transcription.txt', result["text"])
+    model = whisper.load_model(args.modelname, device=check_device())
+    result = model.transcribe(args.audio_file.absolute().__str__(), )
+    format_result(TMP_DIR / 'transcription.txt', result["text"])
 
 
 def format_result(file_name, text):
@@ -79,7 +102,7 @@ def format_result(file_name, text):
         file.write(format_text)
         choice = input("Do you want to translate audio transcription to English? (Yes/No) ")
     if choice == "Yes":
-        translate_result('transcription.txt', 'translation.txt')
+        translate_result(TMP_DIR / 'transcription.txt', TMP_DIR / 'translation.txt')
 
 
 def translate_result(org_file, trans_file):
@@ -99,8 +122,10 @@ def translate_result(org_file, trans_file):
 
 def main():
     """Main function."""
-    get_audio(None,sys.argv[1:])    # Download an mp3 audio file to transcribe to text
-    get_result()            # Get audio transcription and translation if needed
+    args = parse_args()
+    if args.url:
+        get_audio(args)
+    get_result(args)  # Get audio transcription and translation if needed
 
 if __name__ == "__main__":
     main()
