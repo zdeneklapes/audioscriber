@@ -22,6 +22,7 @@ from distutils.util import strtobool
 
 ROOT_DIR = Path(__file__).resolve().parent
 TMP_DIR = ROOT_DIR / "tmp"
+TMP_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def banner(text):
