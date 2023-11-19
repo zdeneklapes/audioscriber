@@ -4,8 +4,12 @@ Audio transcriber using OpenAI's Whisper speech recognition model.
 Usage: python3 transcriber.py -u, --url <URL>
 """
 import getopt
+import json
+import os
 import re
 import sys
+from pprint import pprint
+
 import torch
 import whisper
 
@@ -20,10 +24,23 @@ ROOT_DIR = Path(__file__).resolve().parent
 TMP_DIR = ROOT_DIR / "tmp"
 
 
+def banner(text):
+    """Display a message when the script is working in the background"""
+    print(f"# {text} #")
+
 def parse_args():
     """Parse command line arguments."""
+    banner("Parsing command line arguments")
     parser = argparse.ArgumentParser(description="Audio transcriber using OpenAI's Whisper speech recognition model.")
     parser.add_argument("-u", "--url", type=str, nargs='?', help="YouTube video URL")
+    parser.add_argument("--verbose", type=lambda x: bool(strtobool(x)),
+                        nargs='?',
+                        default=False,
+                        help="Display more information")
+    parser.add_argument("--debug", type=lambda x: bool(strtobool(x)),
+                        nargs='?',
+                        default=os.getenv("DEBUG", False),
+                        help="Display debug information")
     parser.add_argument("--audio-file", type=Path, nargs='?', default=TMP_DIR / "audio.mp3",
                         help="Path to audio file on disk")
     parser.add_argument("--transcription-file", type=Path, nargs='?', default=TMP_DIR / "transcription.txt",
@@ -37,6 +54,9 @@ def parse_args():
                         default=False,
                         help="Translate audio transcription to English")
     args = parser.parse_args()
+
+    if args.debug:
+        pprint(vars(args))
     return args
 
 
@@ -72,10 +92,6 @@ def get_audio(args):
         ydl.download([video_info['webpage_url']])
 
 
-def banner(text):
-    """Display a message when the script is working in the background"""
-    print(f"# {text} #")
-
 
 def check_device():
     """Check CUDA availability."""
@@ -88,34 +104,38 @@ def check_device():
 
 def get_result(args):
     """Get speech recognition model."""
-    banner("Transcribing text")
+    banner("Loading speech recognition model")
     model = whisper.load_model(args.modelname, device=check_device())
-    result = model.transcribe(args.audio_file.absolute().__str__(), )
-    format_result(TMP_DIR / 'transcription.txt', result["text"])
+    banner("Transcribing audio")
+    result = model.transcribe(
+        audio=args.audio_file.absolute().__str__(),
+        verbose=args.verbose,
+    )
+    format_result(args, result["text"])
 
 
-def format_result(file_name, text):
+def format_result(args, text):
     """Put a newline character after each sentence and prompt user for translation."""
+    banner("Formatting transcription")
     format_text = re.sub('\.', '.\n', text)
-    with open(file_name, 'a', encoding="utf-8") as file:
+    with open(args.translation_file, 'a', encoding="utf-8") as file:
         banner("Writing transcription to text file")
         file.write(format_text)
-        choice = input("Do you want to translate audio transcription to English? (Yes/No) ")
-    if choice == "Yes":
-        translate_result(TMP_DIR / 'transcription.txt', TMP_DIR / 'translation.txt')
+    if args.translate:
+        translate_result(args)
 
 
-def translate_result(org_file, trans_file):
+def translate_result(args):
     """
     Translate transcribed text. Credit to Harsh Jain at educative.io
     https://www.educative.io/answers/how-do-you-translate-text-using-python
     """
     translator = Translator()  # Create an instance of Translator() class
-    with open(org_file, 'r', encoding="utf-8") as transcription:
-        contents = transcription.read()
+    with open(args.transcription_file, 'r', encoding="utf-8") as transcription:
         banner("Translating text")
+        contents = transcription.read()
         translation = translator.translate(contents)
-    with open(trans_file, 'a', encoding="utf-8") as file:
+    with open(args.translation_file, 'a', encoding="utf-8") as file:
         banner("Writing translation to text file")
         file.write(translation.text)
 
