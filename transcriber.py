@@ -49,7 +49,7 @@ def parse_args():
     parser.add_argument("--translation-file", type=Path, nargs='?', default=TMP_DIR / "translation.txt",
                         help="Path to translation file on disk")
     parser.add_argument("--modelname", type=str, nargs='?', default="large",
-                        help=f"Select speech recognition model name: {whisper.available_models()}")
+                        help=f"Select speech recognition model name: {whisper.available_models()}",)
     parser.add_argument("--translate", type=lambda x: bool(strtobool(x)),
                         nargs='?',
                         default=False,
@@ -119,7 +119,7 @@ def format_result(args, text):
     """Put a newline character after each sentence and prompt user for translation."""
     banner("Formatting transcription")
     format_text = re.sub('\.', '.\n', text)
-    with open(args.translation_file, 'a', encoding="utf-8") as file:
+    with open(args.transription_file, 'a', encoding="utf-8") as file:
         banner("Writing transcription to text file")
         file.write(format_text)
     if args.translate:
